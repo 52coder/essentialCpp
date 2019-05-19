@@ -1,0 +1,232 @@
+	一般而言，class由两部分组成：一组公开的操作函数和运算符，以及一组私有的实现细节。这些操作函数和运算符被称为class's member function(成员函数)，并代表这个class的公开接口。
+4.1 如何实现一个class
+	stack的实现，参考stack.h, stackmain.cpp
+	练习4.1,4.2参考stack.h, stackmain.cpp
+
+4.2 什么是Constructors(构造函数)和Destructors(析构函数)
+	构造函数用于初始化数据成员变量。constructors的函数名称必须与class名称相同。语法规定，constructor不应该返回型别，亦不需要返回任何值。它可以被重载。
+	一旦class object被定义出来，编译器便自动根据获得的参数，挑选处应被调用的constructor。
+class Triangular{
+public:
+	Triangular();
+	Triangular(int len);
+	Triangular(int len, int beg_pos);
+	// ...
+private:
+	int _length; //元素数目
+	int _beg_pos; //起始位置
+	int _next;	//下一个迭代目标
+};
+	最简单的constructor是所谓的default constructor,它不需要任何参数。这意味着两种情况。第一，它不接受任何参数：
+Triangular::Triangular()
+{
+	_length = 1;
+	_beg_pos = 1;
+	_next = 0;
+}
+第二，它为每个参数提供了默认值：
+class Triangular{
+public:
+	Triangular(int len = 1, int bp = 1);
+};
+	constructor定义式的第二种初始化语法，是member initialization list(成员初始化表)
+Triangular::Triangular(const Triangular &rhs)
+	:_length(rhs._length),
+	_beg_pos(rhs._beg_pos), _next(rhs._beg_pos - 1)
+{}
+	一般情况下，如果成员是class，则使用member initialization list，如果是内建类型，则使用第一种初始化方法。
+
+	和constructor对立的是destructor。所谓destructor是用户自定义的一个class member。一旦某个class提供了desctructor，当其objects结束生命时，便会自动调用destructor处理。destructor主要用来释放在constructor中或对象声明周琦中配置的资源。
+	destructor的名称有严格规定：class名称再加上‘～’前导符号。它绝对不会有返回值，也没有任何参数。正由于其参数表是空的，所以也绝不可能被重载。
+class Matrix{
+public:
+	Matrix(int row, int col):_row(row), _col(col){}
+	~Matrix()
+	{
+		delete [] _pmat;
+	}
+private:
+	int _row, _col;
+	double *pmat;
+};
+
+Memberwise Initialization(成员逐一初始化)
+	默认情况下，当我们执行：
+Triangular tri1(8);
+Triangular tri2 = tri1;
+时，class data members会被依次复制，这是default memberwise initializaiton(默认的成员逐一初始化操作)
+但是对上例的Matrix却行不通。
+{
+	Matrix mat(4, 4);
+	{
+		Matrix mat2 = mat;
+		// mat2的destructor发生作用
+	}
+	// mat的destructor发生作用
+}
+但是，default memberwise initialization会执行如下操作：
+mat2._pmat = mat._pmat;
+这会使得两个对象的_pmat都寻址到heap内的同一个数组。当Matrix destructor施行于mat2身上时，该数组空间被释放，但是mat的_pmat仍然指向这个数组，结果是对空间已经被释放的数组进行操作。
+所以，我们得定义copy constructor，用来改变“成员逐一初始化”的默认行为。
+备注： 析构+复制构造函数+赋值操作符，通常一起出现。
+Matrix::Matrix(const Matrix &rhs):_row(rhs._row), _col(rhs._col)
+{
+	int elem_cnt = _row * _col;
+	_pmat = new double[elem_cnt];
+	for (int ix = 0; ix < elem_cnt; ix++) {
+		_pmat[ix] = rhs._pmat[ix];
+	}
+}
+
+4.3 何谓mutable和const
+	假设我们有一个函数：
+int sum(const Triangular &trian)
+{
+	int beg_pos = trian.beg_pos();
+	int length = trian.length();
+	int sum = 0;
+	for (int ix = 0; ix < length; ++ix) {
+		sum += trian.elem(beg_pos + ix);
+	}
+	return sum;
+}
+由于trian是const reference参数，所以必须保证sum函数中不修改trian。这样得保证beg_pos，length等函数存在const形式。
+class Triangular{
+public:
+	Triangular();
+	Triangular(int len);
+	Triangular(int len, int beg_pos);
+	
+	int length() const { return _length; }
+	int beg_pos() const {return _beg_pos;}
+	int elem(int pos) const;
+
+	bool next(int &val);
+	void next_reset() {_next = _beg_pos - 1;}
+private:
+	int _length; //元素数目
+	int _beg_pos; //起始位置
+	int _next;	//下一个迭代目标
+
+	static vector<int> _elems;
+};
+	假设我们编写如下函数：
+class val_class{
+public:
+	val_class(const BigClass &v):_val(v){}
+
+	BigClass &val() const {return _val;}
+private:
+	BigClass _val;
+};
+这样绝对会产生问题：返回一个non-const reference，等于把_val开放出去，允许程序在其它地方加以修改。所以我们得定义两份val:
+const BigClass &val() const {return _val;}
+BigClass &val() {return _val;}
+Mutable Data Member(可变的数据成员)
+	以下是sum的另一种做法：
+int sum(const Triangular &trian)
+{
+	if (!trian.length()) {
+		return 0;
+	}
+	int val, sum = 0;
+	trian.next_reset();
+	while (trian.next(val)) {
+		sum += val;
+	}
+	return sum;
+}
+	因为trian是const reference，所以程序出错。因为next_reset会导致_next被修改。
+	_length和_beg_pos提供了数列的抽象属性，如果我们改变trian的长度起始位置，形同改变其性质，和未改变前的状态不再相同。然而_next只是用来让我们得以实现出iterator机制，它本身不属于数列抽象概念的一环。改变_next的值，从意义上来说，不能视为改变class object的状态，或说不算是破坏了对象的常数性。关键词mutable可以让我们做出这样的声明，只要将_next标识为multable，我们就可以宣称：对_next所做的改变并不会破坏class object的常数性。
+	class Triangular{
+	public:
+		bool next(int &val) const;
+		void next_reset() const {_next = _beg_pos - 1;}
+
+	private:
+		mutable int _next;
+		int _beg_pos;
+		int _length;
+	};
+
+4.4 什么是this指针
+	当我们编写copy函数的时候：
+Triangular tr1(8);
+Triangular tr2(8, 9);
+tr1.copy(tr2);
+	我们可这样编写copy函数：
+Triangular &Triangular::copy(const Triangular &rhs)
+{
+	if (this != &rhs) {
+		_length = rhs._length;
+		_beg_pos = rhs._beg_pos;
+		_next = _rhs._beg_pos - 1;
+	}
+	return *this;
+}
+
+4.5 Static Class Member(静态的类成员)
+	static data members用来表示唯一一份可共享的members。它可以在同型的所有对象中被存取。
+class Triangular{
+public:
+	//
+private:
+	static vector<int> _elems;
+};
+定义如下：
+	vector<int> Triangular::_elems;
+我们也可以指定初值：
+	int Triangular::_initial_size = 8;
+Static Member Function(静态成员函数)
+	考虑以下函数：
+bool Triangular::is_elem(int value)
+{
+	if (!_elems.size() || _elems[_elems.size() - 1] < value)
+		gen_elems_to_value(value);
+	vector<int>::iterator found_it;
+	vector<int>::iterator end_id = _elems.end();
+
+	found_it = find(_elems.begin(), end_it, value);
+	return found_it != end_it;
+}
+	一般情况下，member function必须通过其类的某个对象来调用。这个对象会被绑定至该member function的this指针身上。通过存储于每个对象中的this指针，member function才能够存取存储于每个对象中的non-static data members.
+	然而，上述的is_elem()并不存取任何non-static data member。它的运行和任何对象都没有任何关联，因而应该可以很方便的以一般non-member function的方式调用。
+	所以，我们可以声明static成员函数，代表与任何对象都无瓜葛。
+class Triangular{
+public:
+	static bool is_elem(int);
+	// ...
+};
+一个实现的triangular参考triangular.cpp
+
+4.6 打造一个Iterator Class
+	参考triangular_iterator.h和main.cpp
+
+4.7 合作关系必须建立在友谊的基础上
+	查看triangular_iterator.h的代码，我们发现friend的存在。
+	代码中，由于Triangular_iterator被声明为Triangular的友元，所以Triangular_iterator的任何函数都可以读取Triangular的任何public/private变量。
+
+4.8 实现一个copy assignment operator
+	默认情况下，当我们将某个class object赋值给另一个：
+	Triangular tri1(8), tri2(8, 9);
+	tri1 = tri2;
+时，class data members会被依次复制过去。但是如果类似Matrix，则需要一个copy constructor和一个copy assignment operator.
+Matrix &Matrix::operator=(const Matrix &rhs)
+{
+	if (this != &rhs) {
+		_row = rhs._row;
+		_col = rhs._col;
+		int elem_cnt = _row * _col;
+
+		delete [] _pmat;
+		_pmat = new double[elem_cnt];
+		for (int ix = 0; ix < elem_cnt; ++ix) {
+			_pmat[ix] = rhs._pmat[ix];
+		}
+	}
+	return *this;
+}
+
+4.9 实现一个function object
+	参考func.cpp
+

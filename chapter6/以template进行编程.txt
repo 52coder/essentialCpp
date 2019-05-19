@@ -1,0 +1,4 @@
+1. 参考binary.cpp，以template形式实现的二叉树(比C语言实现起来，麻烦多了。但是具有template性质)
+
+6.6 常数表达式与默认参数
+	参考fibonacci.cpp

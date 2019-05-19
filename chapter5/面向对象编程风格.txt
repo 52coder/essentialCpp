@@ -1,0 +1,195 @@
+5.1 面向对象(object-oriented)编程概念
+	面向对象编程概念的两项最主要的特性是： 继承和多态。前者使我们得以将一群相关的类组织起来，并让我们得以分享其间的共通数据和操作行为，后者让我们在这些类之上进行编程时，可以如同操控单一个体，而非相互独立的类，并赋予我们更多弹性来加入或移除任何特定类。
+	继承机制定义了父子关系。父类定义了所有子类共通的对外公开接口和私有实现内容。每个子类都可以增加或改写继承而来的东西，以实现它自身独特的行为。
+	下图是图书馆的借阅系统的类体系：
+					LibMat
+	------------------------------------------
+	|			|			|			|
+   book		childToys	  magazines	   files
+    |
+    ---------------------
+    |	 		|		|
+rentalbook	audiobook cidbook
+	在面向对象应用程序中，我们会间接利用“指向抽象基类”的pointer或reference来操作系统中的各对象，而不直接操作各个实际对象。这让我们得以在不更动旧有程序的前提下，加入或移除任何一个派生类：
+void load_check_in(LibMat &mat)
+{
+	// mat实际上代表某个派生类的对象（derived class object)
+	// 例如book, rentalbook, magazines
+	mat.check_in();
+
+	if (mat.is_late())
+		mat.assess_find();
+	if (mat.waiting_list())
+		mat.notify_available();
+}
+	我们的程序中并不存在LibMat对象，只有book, rentalbook, audiocds等类对象。这个函数实际上如何运行呢？例如，当我们通过mat调用check_in()时，mat必得参考到我们程序中的某个实际对象。此外，被调用的check_in()函数也势必被决议(resolved)为mat所代表之实际对象所拥有的那个check_in()函数。这便是整个进行过程，通过多态来完成。
+	多态： 让积累的pointer或reference得以十分透明的指向其任何一个派生类的对象。
+	动态绑定： 在执行期间，我们才会明白究竟是哪个派生类调用check_in函数。
+	继承特性让我们得以定义一整群互有关系的类，并共享共通的接口。多态则让我们得以用一种与型别无关的方式来操作这些类对象。我们通过抽象积累的pointer或reference来操控其共通接口，而实际执行起来的操作则需要等到执行期，依据pointer或reference所寻址之实际对象的型别才能决定。
+
+5.2 漫游：面向对象编程思维
+	具体的实现代码参考：mat.cpp
+
+5.3 不带继承的多态
+	pass
+
+5.4 定义一个抽象基类
+	定义抽象类的第一个步骤是找出所有子类共通的操作行为。这是第一次尝试编写：
+class num_sequence{
+public:
+	// elem(pos):返回pos位置上的元素
+	// gen_elems(pos):产生直到pos位置的所有元素
+	// what_am_i(): 返回确切的数列型别
+	// print(os): 将所有元素写入os
+	// check_integrity(pos): 检查pos是否为有效位置
+	// max_elems(): 返回所支持的最大位置值
+	int elem(int pos);
+	void gen_elems(int pos);
+	const char* what_am_i() const;
+	ostream& print(ostream &os = cout) const;
+	bool check_integrity(int pos);
+	static int max_elems();
+};
+	设计抽象基类的下一步，便是设法找出哪些操作行为与型别相依：有哪些操作行为必须根据不同的派生类而有不同的实现方式。这些操作行为应该成为整个类继承体系中的虚拟函数。
+	注意： static member function无法被声明为虚拟函数。
+	设计抽象基类的第三步，便是试着找出每个操作行为的存取层级。如果某个操作行为应该让一般程序皆能使用，我们应该将它声明为public。如果某个操作行为在基类之外不需要被用到，我们就将它声明为private。即使是该基类的派生类，亦无法取用基类的private member。而protected，这种层级的操作行为可以让派生类取用，却不允许一般程序使用。
+class num_sequence{
+public:
+	virtual ~num_sequence(){};
+
+	virtual int elem(int pos) const = 0;
+	virtual const char* what_am_i() const = 0;
+	static int max_elems() {return _max_elems;}
+	virtual ostream &print(ostream &os = cout) const = 0;
+
+protected:
+	virtual void gen_elems(int pos) const = 0;
+	bool check_integrity(int pos) const;
+
+	const static int _max_elems = 1024;
+};
+	每个虚拟函数，要么得有其定义，要么可设为“纯”虚拟函数(pure virtual function)--如果对于该类而言，这个虚拟函数并无实质意义的话，例如gen_elems()之于num_sequence class，将虚拟函数赋值为0，意思便是令它为一个“纯”虚拟函数。
+virtula void gen_elems(int pos) = 0;
+	任何类如果声明有一个（或多个）纯虚拟函数，那么由于其接口的不完整性（纯虚拟函数没有函数定义，是谓不完整），程序无法为它产生任何对象。这种类智能作为派生类的子对象之用，而且前提是这些派生类必须为所有虚拟函数提供确切的定义。
+	那么constructor和destructor又当如何？由于此类并没有任何non-static data member需要进行初始化操作，所以其constructor亦无存在价值。一般情况下，凡基类定义有一个（或多个）虚拟函数，应该要将其destructor声明为virtual：
+class num_sequence{
+public:
+	virtual ~num_sequence();
+	// ...
+};
+为什么呢？考虑以下程序片段：
+num_sequence *ps = new Fibonacci(12);
+//...使用数列
+delete ps;
+ps是基类num_sequence的指针，但它实际上指向派生类Fibonacci对象，当delete表达式被施行于该指针身上时，destructor会先施行于指针所指的对象身上，于是将此对象占用的内存空间归还给程序的自由区域。non-virtual函数在编译期便已完成决议，根据该对象被调用时的型别来判断。
+于是，这个例子中，通过ps调用的destructor一定是Fibonacci destructor，不是num_sequence destructor。正确的情况应该是“根据实际对象的型别选择调用哪一个destructor”，而此决议操作应该在执行器进行。为了促成正确行为的发生，我们必须将destructor声明为virtual。
+	对于这类destructor，我们通常提供空白定义，而非声明为纯虚函数：
+inline num_sequence::~num_sequence(){}
+
+5.5 定义一个派生类
+	派生类有两部分组成：一是基类所构成的子对象，由基类的non-static data members组成，二是派生类的部分（由派生类的non-static data members组成）。
+class Fibonacci : public num_sequence{
+public:
+	Fibonacci(int len = 1, int beg_pos = 1)
+		:_length(len), _beg_pos(beg_pos){}
+	virtual int elem(int pos) const;
+	virtual const char *what_am_i() const {return "Fibonacci";}
+	virtual ostream &print(ostream &os = cout) const;
+	int length() const {return _length;}
+	int beg_pos() const {return _beg_pos;}
+protected:
+	virtual void gen_elems(int pos) const;
+	int _length;
+	int _beg_pos;
+	static vector<int> _elems;
+};
+	在此类的设计中，length()和beg_pos()被声明为non-virtual，因为它们并无基类所提供的实体可供改写。但也因为它们并非基类提供之接口的一员，所以当我们通过基类的pointer或reference进行操作时，无法取用它们。
+// ok: 通过虚拟函数机制，调用了Fibonacci::what_am_i()
+ps->what_am_i();
+//ok: 调用继承而来的num_sequence::max_elems()
+ps->max_elems();
+// 错误：length()并非num_sequence接口中的一员
+ps->length();
+// ok： 通过虚拟函数机制调用Fibonacci destructor
+delete ps;
+	我们要么在基类中定义length()和beg_pos()的虚拟函数，要么将存储长度和起始位置的空间由派生类抽离出来，移至基类。于是length()和beg_pos()都成了继承而来的inline nonvirtual function.
+	但是如何设计，是一个不断更迭的过程，没有最好的，只有适合当前的设计。
+int Fibonacci::elem(int pos) const
+{
+	if (!check_integrity(pos))
+		return 0;
+	if (pos > _elems.size())
+		Fibonacci::gen_elems(pos);
+	return _elems[pos - 1];
+}
+之所以编写Fibonacci::gen_elems(pos);这样不必等到执行器才进行gen_elems()的决议操作。事实上我们希望跳过虚拟函数机制，使得该函数在编译期就完成决议，不必等到执行器决议。
+	具体的实现代码参考：num_sequence.h, fibonacci.h,main.cpp
+
+5.7 基类应该多么抽象
+	在目前的设计之下，抽象基类提供的是接口，并未提供任何实现内容。每个派生类不仅必须提供本身专属的元素产生算法，还必须支持特定元素的搜寻，元素的打印，数列长度和起始位置的维护等任务。
+	如果抽象基类的设计者，同时提供了一些派生类，而且他预期不会有其他派生类需要加入此继承体系内，那么这样的设计可以顺畅运行。但如果时常需要加入新的数列类，那么这样的设计反而会使得派生类的加入工作变得更为复杂。
+class num_sequence{
+public:
+	virtual ~num_sequence() {}
+	virtual const char *what_am_i() const = 0;
+	int elem(int pos) const;
+	ostream &print(ostream &os = cout) const;
+	int length() const {return _length;}
+	int beg_pos() const {return _beg_pos;}
+	static int max_elems() {return 64;}
+
+protected:
+	virtual void gen_elems(int pos) const = 0;
+	bool check_integrity(int pos, int size) const;
+
+	num_sequence(int len, int bp, vector<int> &re)
+		:_length(len), _beg_pos(bp), _relems(re){}
+	int _length;
+	int _beg_pos;
+	vector<int> &_relems;
+};
+class Fibonacci : public num_sequence {
+public:
+	Fibonacci(int len = 1, int beg_pos = 1);
+	virtual const char *what_am_i() const {return "Fibonacci";}
+protected:
+	virtual void gen_elems(int pos) const;
+	static vector<int> _elems;
+};
+
+5.8 初始化，析构，复制
+	如今的num_sequence具有实际的data members，我们必须为它们提供初始化操作。我可以将初始化操作留给每个派生类，但这么做会有潜在性的危机。较好的设计方式是：为基类提供constructor，并利用这个constructor处理基类所声明的所有data members的初始化操作。
+	派生类之constructor,不仅必须为派生类之data members进行初始化操作，还需要为其基类之data members提供适当的值：
+inline Fibonacci::Fibonacci(int len, int beg_pos)
+	:num_sequence(len, beg_pos, _elems)
+	{}
+而copy constructor/copy operator的定义如下：
+Fibonacci::Fibonacci(const Fibonacci &rhs)
+	:num_sequence(rhs)
+	{}
+Fibonacci& Fibonacci::operator=(const Fibonacci &rhs)
+{
+	if (this != &rhs)
+		num_sequence::operator=(rhs)
+	return *this;
+}
+
+5.9 在派生类中定义一个虚拟函数
+	当我们定义派生类时，我们必须决定，究竟要将基类的虚拟函数改写掉，还是原封不动的加以继承。如果我们继承了纯虚拟函数，那么这个派生类也会被视为抽象类，也就无法为它定义任何对象。
+	如果我们决定改写基类所提供的虚拟函数，那么派生类所提供的新定义，其函数类型必须完全符合基类所声明的函数原型，包括：参数列，返回型别，常量性。
+虚拟函数的静态决议(static resolution)
+	在两种情况下，虚拟函数机制不会出现预期行为：(1)在基类的constructor和destructor内；(2)当我们使用的是基类的对象，而非基类对象的pointer或reference时。
+当我们构造派生类对象时，基类的constructor会先被调用。如果在基类的constructor中调用某个虚拟函数，那么由于该派生类中的data members尚未被初始化，所以绝对不会被调用。
+void print(LibMat object, const LibMat *pointer, const LibMat &reference)
+{
+	//以下必定调用LibMat::print()
+	object.print();
+
+	//以下一定会通过虚拟函数机制来进行决议
+	//我们无法预知哪一份print()会被调用
+	pointer->print();
+	reference.print();
+}	
+
+5.10 执行期的型别鉴定机制(Run-Time Type Identification)
+	pass

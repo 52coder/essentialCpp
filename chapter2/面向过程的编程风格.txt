@@ -1,0 +1,216 @@
+将函数独立出来的做法有以下三个好处： 
+1. 以一连串函数调用操作，取代重复撰写相同的程序代码，可使程序更容易读懂。
+2. 可以在不同的程序中使用这些函数。
+3. 更轻易将工作分配给其他团队。
+
+2.1 如何撰写函数
+	我们编写如下函数：此函数返回Fibonacci数列中某个由用户指定位置的元素：
+具体实现参考fib.cpp
+代码中有两点需要注意：
+1. 传递的参数为int &elem，这样就保证达到返回两个参数的效果，返回值代表是否正确读取，而elem代表所返回的值。
+2. 进行合理的判断，如果索引小于0而大于1024，则返回错误。
+
+练习2.1：
+	参考代码2.1.cpp
+
+2.2 调用一个函数
+	一个冒泡排序的方法：sort.cpp
+Pass by Reference语意
+	reference扮演着外界与对象之间的一个间接号码牌的角色。只要在型别名称和reference名称之间插入&符号，便是声明了一个reference。
+int ival = 1024;
+int *pi = &ival;
+int &rval = ival;
+当我们这么写：
+int jval = 4096;
+rval = jval;
+时，便是将jval赋值给rval所代表的对象。
+	面对reference的所有操作都像面对“reference所代表之对象”所进行的操作一般无二。所以我们可以这样编写swap函数：
+void swap(int &val1, int &val2)
+{
+	int temp = val1;
+	val1 = val2;
+	val2 = temp;
+}
+当我们以by reference方式传递对象当做函数参数，对象本身并不会复制出另一份---复制的是对象的地址。函数中对该对象进行的任何操作，都相当于是对传入的对象进行间接的操作。
+	将参数声明为reference通常有两个原因：
+1） 希望得以直接对所传入的对象进行修改。
+2） 为了降低复制大型对象的负担。
+	一般情况下，我们也可以传递指针来代替引用。但是指针得判断是否为空指针，而引用则无须此判断。
+	一般来说，除非我们希望在函数内更改参数值，否则在传递内建型别时，不要使用传址方式。传址机制主要是作为传递class objects用的。
+生存空间（scope）及生存范围（extent）
+	除了static例外，函数内定义的对象，只存活于函数执行之际。如果将这些局部对象（local object）的地址返回，会导致执行器错误。如果以传值的方式返回倒正确，因为返回的是复制品。
+	内建型别的对象，如果定义在file scope之外，必定被初始化为0.但如果它们被定义于local scope之内，那么除非程序员指定其初始值，否则不会被初始化。
+动态内存管理
+	我们可以使用new和delete来进行动态的内存管理。
+int *pia = new int[24];
+delete [] pia;
+删除数组时候之所以要[]，是因为如果没有[]，则动态释放的是第一个数组元素的空间。[]在内部会产生数组的长度，进行释放。
+
+2.3 提供默认参数值
+	假设我们需要对bubble_sort提供参数，用于记录swap的参数，我们编写函数如下：
+void bubble_sort(vector<int> &vec, ofstream &ofil)
+{
+	for (int ix = 0; ix < vec.size(); ++ix) {
+		for (int jx = ix + 1; jx < vec.size(); ++jx) {
+			if (vec[ix] > vec[jx]) {
+				ofil << "about to call swap! ix: " << ix
+					 << " jx: " << jx << "\tswapping: "
+					 << vec[ix] << " with " << vec[jx] << endl;
+			}
+			swap(vec[ix], vec[jx], ofil);
+		}
+	}
+}
+	但此程序无法关闭调试信息。所以我们需要提供默认参数（指针），并令其默认值为0（之所以不是引用，是因为引用必须引用某个对象）
+void bubble_sort(vector<int> &vec, ofstream *ofil=0)
+{
+	for (int ix = 0; ix < vec.size(); ++ix) {
+		for (int jx = ix + 1; jx < vec.size(); ++jx) {
+			if (vec[ix] > vec[jx]) {
+				if (ofil != 0) {
+					(*ofil) << "about to call swap! ix: " << ix
+						 << " jx: " << jx << "\tswapping: "
+						 << vec[ix] << " with " << vec[jx] << endl;
+				}
+			}
+			swap(vec[ix], vec[jx], ofil);
+		}
+	}
+}
+	我们也可以将display函数修改为如下：
+void display(const vector<int> &vec, ostream &os = cout)
+{
+	for (int ix = 0; ix < vec.size(); ++ix) {
+		os << vec[ix] << ' ';
+	}
+	os << endl;
+}
+关于默认参数值的提供，有两个不甚直观的规则。第一个规则是，默认值的决议（resolve)操作由最右边开始进行。如果我们为某个参数提供了默认值，那么这个参数右侧的所有参数都必须也具有默认参数才行。下列属于非法：
+void display(ostream &os = cout, const vector<int> &vec);
+第二个规则是，默认值只能否指定一次，可以在函数声明处，也可以在函数定义处。但我们一般都在函数的声明处指定默认值。
+
+2.4 使用局部静态对象
+	局部静态对象所处于的内存空间，即使在不同的函数调用过程中，依然存在。所以我们可以使用局部静态对象修改Fibonacci函数(参考newfib.cpp)
+
+2.5 声明一个inline函数
+	我们可以将Fibonacci函数分开写成如下三个函数：
+bool is_size_ok(int size)
+{
+	const int max_size = 1024;
+	if (size <= 0 || size > max_size) {
+		cerr << "Oops: requested size is not supported: " << size << endl;
+		return false;
+	}
+	return true;
+}
+
+const vector<int> *fibon_seq(int size)
+{
+	const int max_size = 1024;
+	static vector<int> elems;
+
+	if (!is_size_ok(size)) {
+		return 0;
+	}
+	for (int ix = elems.size(); ix < size; ++ix) {
+		if (ix == 0 || ix == 1) {
+			elems.push_back(1);
+		} else {
+			elems.push_back(elems[ix -1] + elems[ix - 2]);
+		}
+	}
+	return &elems;
+}
+
+bool fibon_elem(int pos, int &elem)
+{
+	const vector<int> *pseq = fibon_seq(pos);
+	if (!pseq) {
+		elem = 0;
+		return false;
+	}
+	elem = (*pseq)[pos - 1];
+	return true;
+}
+	但是如果执行性能不理想，我们可以将函数声明为inline即可。
+
+2.6 提供重载函数
+	重载函数的区分在于：参数的不同。
+
+2.7 定义并使用Template Function
+	function template将参数表中指定的所有（或部分）参数的型别信息抽离出来。
+	function template以关键词template开场，其后紧接着成对尖括号包围起来的一个或多个识别的名称。
+template <typename elemType>
+void display_message(const string &msg, const vector<elemType> &vec)
+{
+	cout << msg;
+	for (int ix = 0; ix < vec.size(); ++ix) {
+		elemType t = vec[ix];
+		cout << t << ' ';
+	}
+}
+则我们可以如下调用display_message：
+vector<int> ivec;
+string msg;
+display_message(msg, ivec);
+
+vector<string> svec;
+display_message(msg, svec);
+
+	一般而言，如果函数具备多种实现方式，我们可将它重载，其每份实体提供的是相同的通用服务。如果我们希望让程序代码的主体不变，仅仅改变其中用到的数据型别，可以通过function template达成目的。
+
+2.8 函数指针（Pointers to Funcitons)带来更大的弹性
+	书上的函数指针不太好进行概括，我们通过一个简单的程序来说明一切：
+#include <iostream>
+#include <vector>
+#include <string>
+using namespace std;
+ 
+void fun1(int iValue)
+{
+    cout << iValue << endl;
+}
+ 
+void fun2(float fValue)
+{
+    cout << fValue << endl;
+}
+ 
+void fun3(string sValue)
+{
+    cout << sValue << endl;
+}
+ 
+template<typename funType>
+void fun(void (*subfun)(funType), funType val)
+{
+    (*subfun)(val);
+}
+ 
+int main(void)
+{
+    fun<int>(fun1, 12);
+    fun<float>(fun2, 12.3);
+    fun<string>(fun3, "hello world");
+ 
+    return 0;
+}
+这里我们可以这样编写:
+fun(fun1, 12);
+但是不能这样编写: fun(fun2, 12.3);
+因为编译器无法区分float和double.
+
+2.9 设定头文件
+	任何函数都可以有多份声明，但是只会有一份定义。所以声明通常放在头文件中，inline函数是例外，inline定义放在头文件中。
+关于尖括号和双引号的区别：
+	如果此文件被认定为标准的，或项目专属的头文件，我们便以尖括号将文件名括住。编译器搜寻此文档时，会先在某些默认的驱动器目录中找寻。如果文件名由成对的双引号括住，此文件便被认为是一个用户自行提供的头文件；搜寻此文件时，会由含入此文件之文件所在的驱动器目录开始找起。
+
+练习2.2：
+	参考习题2.2.cpp
+练习2.3：
+	参考习题2.3.cpp
+练习2.4：
+	参考习题2.4.cpp
+练习2.5,2.6：
+	以模板形式，不知道如何传递参数，整体思想会，但实际代码却运行除错。
+	后面学习到模板，再次补上。

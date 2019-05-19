@@ -1,0 +1,259 @@
+STL主要由两种组件构成： 一是容器，包括vector，list，set， map等。另一种组件是用以操作这些容器类的泛型算法，包括find(), sort(), replace(),merge()等等。
+vector和list是序列式容器，序列式容器会依次维护第一个元素，第二个元素。。。直到最后一个元素。我们在序列式容器身上主要进行所谓的迭代操作。map和set这两种容器属于关联式容器。关联式容器可以让我们快速寻找容器中的元素值。
+map是key/value组合。
+set： 仅包含key
+泛型算法： 提供了许多可施行于容器类及数组型别上的操作行为iezhexie算法之所以被称为泛型算法，因为它们和它们想要操作的元素型别无关。泛型算法通过function template技术，达成“与操作对象之型别相互独立”的目的。而达成“与容器无关”的诀窍，就是不要直接在容器身上进行操作。取代方法是：以一对iterators（first，last）来进行迭代操作。
+
+3.1 指针的算术运算
+	假设我们想要编写一个通用的find函数，可用于处理不同的数组（数组元素可以为字符串，也可以为整型），那么我们可以使用指针来完成数组的迭代：
+template <typename elemType>
+elemType *find(const elemType *first, const elemType *last, const elemType &value)
+{
+	if (!fitst || !last) {
+		return 0;
+	}
+	for (; first != last; ++first) {
+		if (*first == value) {
+			return first;
+		}
+	}
+	return 0;
+}
+测试代码文件： findarr.cpp
+但如果我们增加vector的比较呢？我们需要明白对于vector来说，没有所谓的“数组名为地址”一说。所以我们需要编写begin，end函数，用来指代vector的第一个元素和最后一个元素的下一个元素地址。
+template <typename T>
+inline elemType *begin(const vector<elemType> &vec)
+{
+	return vec.empty() ? 0 : &vec[0];
+}
+但是end不知道如何编写--_--
+当我们知道begin，end后，我们可以执行：
+find(begin(svec), end(svec), search_value);
+	但是这种方法对list又无效。因为list的内部实现为链表，每个元素在内存中并不是连续存储的。
+	解决办法是： 在底层指针的行为之上提供一层抽象化机制，取代程序原本的“指针直接操作”方式。
+
+2. 了解Iterators
+	假设first和last为iterator class objects
+while (first != last) {
+	cout << *first << ' ';
+	++first;
+}
+	这就好像把first和last当做指针一样，唯一的差别在于其dereference(*)运算符，!=,++运算符乃是iterator classes内相关的inline函数提供。
+	每个标准容器的begin()返回first，end()返回last。而迭代器的声明语法如下：
+vector<int>::iterator beg = svec.begin();
+则改进后的find的泛型算法如下：
+template<typename IteratorType, typename elemType>
+IteratorType find(IteratorType first, IteratorType last, const elemType &value)
+{
+	for (; first != last; ++first) {
+		if (value == *first) {
+			return first;
+		}
+	}
+	return last;
+}
+具体参考findVec.cpp
+以下是一部分泛型算法：
+搜寻算法： find(), count(), adjacent_find(), find_if(), count_if(), binary_search(),find_first_of()
+排序及次序整理算法： merge(), partial_sort(), partion(), random_shuffle(), reverse(), rotate(), sort()
+复制，删除，替换算法： copy(), remove(), remove_if(),replace(), replace_if(),swap(), unique()
+关系算法： equal(), includes(), mismatch()
+生成与质变算法： fill(), for_each(), generate(), transform()
+数值算法： accmulate(), adjacent_difference(), partial_sum(), inner_product()
+集合算法： set_union(), set_difference()
+
+3.3 所有容器的共通操作
+==，！=，=
+empty(): 判断容器是否为空
+size(): 返回容器的大小
+clear(): 删除所有元素
+begin(): 返回一个iterator，指向容器的第一个元素
+end(): 返回一个iterator，指向容器的最后一个元素的下一个位置
+insert(): 将单个或某个范围内的元素插到容器内
+erase(): 将容器内的单一元素或某个范围内的元素删除
+
+3.4 使用序列式容器
+我们可以将vector比作数组，而list比作双向链表。所以vector适合数列，而list适合随机存取。
+我们通过push_back()和pop_back()进行尾部的插入和删除。而list和deque提供push_front()和pop_front()。pop_back()和pop_front()都不会返回被删除的元素值，所以应该先使用front()/back()，然后执行pop_back()/pop_front().
+insert和erase的变形如下：
+iterator insert(iterator position, elemType value);
+void insert(iterator position, int count, elemType value);
+void insert(iterator1 position, iterator2 first, iterator2 last);
+void insert(iterator position);//插入默认值
+
+iterator erase(iterator position);
+iterator erase(iterator first, iterator last);
+
+3.5 使用泛型算法
+包含algorithm。
+
+3.6 如何设计一个泛型算法
+	假定我们设计一个函数： 用户给予一个整数vector，我们必须返回一个新的vector，里面的元素均小于10.一个快速的实现方法如下：
+vector<int> less_than_10(const vector<int> &vec)
+{
+	vector<int> nvec;
+	for (int ix = 0; ix < vec.size(); ++ix) {
+		if (vec[ix] < 10) {
+			nvec.push_back(vec[ix]);
+		}
+	}
+	return nvec;
+}
+但是这个函数有以下两个缺点：1.如果我们想找小于11的元素，则得另写函数。 2.如果我们允许用户指定不同的操作，则无法完成。
+我们可以将函数修改如下：
+vector<int> filter_ver1(const vector<int> &vec, int filter_value, bool (*pred)(int, int))
+{
+	vector<int> nvec;
+	for (int ix = 0; ix < vec.size(); ++ix) {
+		if (pred(vec[ix], filter_value)) {
+			nvec.push_back(vec[ix]);
+		}
+	}
+	return nvec;
+}
+以下代码为count_occurs的实现：
+int count_occurs(const vector<int> &vec, int val)
+{
+	vector<int>::const_iterator iter = vec.begin();
+	int occurs_count = 0;
+	while (( iter = find(iter, vec.end(), val)) != vec.end()) {
+		++occurs_count;
+		++iter;
+	}
+	return occurs_count;
+}
+
+Funciton Objects
+	某种class的实体对象，这类classes对function call进行运算符重载操作，这样可使得function object被当成一般函数来使用。
+标准程序库定义了一组function objects(#include <functional>)，分为算术运算，关系，罗辑运算：
+1） 6个算术运算： plus<type>, minus<type>, negate<type>, multiplies<type>,divides<type>,modules<type>
+2) 6个关系： less<type>, less_equal<type>, greater<type>, greater_equal<type>, equal_to<type>, not_equal_to<type>
+3) 3个罗辑运算： logical_and<type>, logical_or<type>,logical_not<type>
+如递减排序： sort(vec.begin(), vec.end(), greater<int>());
+
+Function Object Adapters
+	对于find_if来说，上述的Function Objects并无法达到要求，因为find_if需要将两个数进行比较，我们需要adapter来将每个元素和指定的数值绑定起来进行比较。
+binder adapter: function object的参数绑定至某特定值身上，使binary function object转换为unary function object。
+标准程序库提供了两个binder adapter: bind1st会将指定值绑定至第一操作数，bind2nd则将指定值绑定至第二操作数。则我们修改如下：
+vector<int> filter(const vector<int> &vec, int val, less<int> &lt)
+{
+	vector<int> nvec;
+	vector<int>::const_iterator iter = vec.begin();
+
+	while (( iter = find_if(iter, vec.end(), bind2nd(lt, val))) != vec.end()) {
+		nvec.push_back(*iter);
+		iter++;
+	}
+	return nvec;
+}
+我们可以使用template+iterators将方法更加泛型化：
+template<typename InputIterator, typename OutputIterator, typename ElemType, typename Comp>
+OutputIterator
+filter(InputIterator first, InputIterator last, 
+		OutputIterator at, const ElemType &val, Comp pred)
+{
+	while ((first = find_if(first, last, bind2nd(pred, val))) != last) {
+		cout << "found value: " << *first << endl;
+		*at++ = *first++;
+	}
+	return at;
+}
+具体实例参考filter.cpp
+	另一种adaptor是所谓的negator，它会逆转function object的真伪值。not1可逆转unary function object的真伪值，not2可逆转binary function object的真伪值。例如，要找出所有大于或等于10的元素，我们可以修改如下：
+while ((iter = find_if(iter, vec.end(), not1(bind2nd(less<int>, 10)))) != vec.end())
+
+3.7 使用Map
+	map是key/value组合。我们可以编写如下代码统计单词的出现次数：
+string tword;
+while (cin >> tword) {
+	words[tword]++;
+}
+如果tword不在words中，则获得默认值0.
+以下for循环会打印出所有单字及其出现次数：
+map<string, int>::iterator it = words.begin();
+for (; it != words.end(); ++it) {
+	cout << "key: " << it->first
+		<< "value: " << it->second << endl;
+}
+通常，我们要判断key是否存在于map中，有以下三种方法：
+1. 将key当做索引
+	int count = words['vermeer'];
+然后判断count是否等于0.但是这种方法有个错误，就是如果words中存在{"vermeer":0}，则这种方法是错误的判断。
+2. 利用find()函数
+	words.find("vermeer") != words.end()
+3. 使用count函数
+	words.count("vermeer") ！= 0.
+
+3.8 使用Set
+ 	我们可以使用count函数判断具体元素是否存在于set中。
+
+3.9 如何使用Iterator Inserters
+	之前编写的filter存在一个误区是：我们需要指定at的容量，但实际中不应该这样实现。
+	STL提供了3个insertion adapters(#include <iterator>)：
+1) back_insreter()会以容器的push_back()函数取代assignment运算符：
+vector<int> result_vec;
+unique_copy(ivec.begin(), ivec.end(), back_inserter(result_vec));
+2) inserter()会以容器的insert()函数取代assignment运算符。inserter()接受两个参数：一个是容器，一个是iterator，指向容器内的安插操作起始点：
+vector<string> svec, res;
+unique_copy(svec.begin(), svec.end(), inserter(svec_res, svec_res.end()));
+3) front_inserter()会以容器的push_front()函数取代assignment运算符。这个inserter只适用于list和deque：
+list<int> ilist_clone;
+copy(ilist.begin(), ilist.end(), front_inserter(ilist_clone));
+具体代码实现参考newfilter.cpp
+
+3.10 使用iostream Iterators
+	标准程序库中定义有输入及输出用的iostream iterator类，称为istream_iterator和ostream_iterator，分别支持单一型别的元素读取和写入。
+我们编写如下代码来学习iostream iterators:
+#include <iostream>
+#include <iterator>
+#include <alrgorithm>
+#include <vector>
+#include <string>
+using namespace std;
+
+int main(void)
+{
+	istream_iterator<string> is(cin);
+	istream_iterator<string> eof;
+
+	vector<string> text;
+	copy(is, eof, back_inserter(text));
+
+	sort(text.begin(), text.end());
+
+	ostream_iterator<string> os(cout, " ");
+	copy(text.begin(), text.end(), os);
+
+	return 0;
+}
+但如果从文件中读取，我们只需要将is绑定到inputfile，os绑定到outputfile中即可。
+#include <iostream>
+#include <fstream>
+#include <iterator>
+#include <alrgorithm>
+#include <vector>
+#include <string>
+using namespace std;
+
+int main(void)
+{
+	ifstream in_file("input_file.txt");
+	ofstream out_file("output_file.txt");
+	if (!in_file || !out_file) {
+		cerr << "!unable to open the files.\n";
+		return -1;
+	}
+
+	istream_iterator<string> is(in_file);
+	istream_iterator<string> eof;
+
+	vector<string> text;
+	copy(is, eof, back_inserter(text));
+
+	sort(text.begin(), text.end());
+
+	ostream_iterator<string> os(out_file, " ");
+	copy(text.begin(), text.end(), os);
+
+	return 0;
+}

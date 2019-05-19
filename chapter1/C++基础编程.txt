@@ -1,0 +1,113 @@
+	我们将从一个小程序出发，通过它来练习C++程序语言的基本组成。其中包括：
+1. 一些基础数据型别：布尔值， 字符，整数和浮点数
+2. 算术运算符，关联运算符以及逻辑运算符，用以操作上述的基础数据型别。
+3. 条件分支以及循环控制语句
+4. 一些复合型别，例如指针和数组
+5. 一套标准的，通用的抽象化程序库，例如字符串和向量。
+
+1.1 如何撰写C++程序
+int main()
+{
+	// 我们的程序代码置于此处
+}
+关键字(int)： 程序语言先行定义的一些具有特殊意义的名称，int用来表示语言内建的整数数据型别。
+函数： 一块独立的程序代码序列，能够执行一些运算，包含以下4个部分： 返回值的型别，函数名称，参数列，以及函数主体。
+1） 函数的返回值： 通常用来表示运算结果。
+2） 函数的名称最好能够提供某些信息。
+3） 参数列： 函数执行时，调用者可以传给函数的型别列表。
+4） 函数的主体： 提供此函数的运算的程序代码。
+
+类： 用户自定义的数据型别。class机制让我们得以将数据型别加入到我们的程序中，并有能力识别它们。
+	欲使用class，我们必须先在程序中含入其头文件。如：
+#include <iostream>
+cout << "Please enter your first name:";
+上述一行便是C++的语句。语句是C++程序的最小独立单元。
+我们可以使用string来存储name，如：
+#include <string>
+string user_name;
+	一个完整的程序如下：
+#include <iostream>
+#include <string>
+using namespace std;
+
+int main(void)
+{
+	string user_name;
+	cout << "Please enter your first name: ";
+	cin >> user_name;
+	cout << "\nHello, "
+		 << user_name
+		 << "... and goodbye!\n";
+
+	return 0;
+}
+关于using namespace std;
+	using和namespace都是C++关键词。std是标准程序库所驻之命名空间的名称。标准程序库所提供的任何事物（例如string class以及cout,cin这两个iostream类对象）都被封装在命名空间std内。
+命名空间是一种将程序库名称封装起来的方法。通过这种方法，可以避免和应用程序发生命名冲突的问题（所谓命名冲突是指在应用程序内两个不同的实体具有相同的名称，导致程序无法区分两者。命名冲突产生时，程序必须等到该命名冲突获得决议之后，才得以继续执行）
+若要在程序中使用string class以及cin，cout这两个iostream类对象，我们不仅得含入<string>及<iostream>，还得让命名空间std内的名称曝光。而所谓的using directive：using namespace std;便是让命名空间中的名称曝光的最简单的方法。
+
+练习1.1：
+	参考1.1.cpp
+练习1.2：
+	将<string>屏蔽掉，在我的机器上并没有报错，并且程序正常运行。g++版本4.8.2
+	而将using namespace std;注释掉，则所有关联string的均报错。
+练习1.3：
+	直接报未定义main函数。
+联系1.4：
+	参考1.4.cpp
+
+1.2 对象的定义与初始化
+	在单一声明语句中定义多个对象，其间隔以逗号区分，如：
+int num_tries = 0, num_right = 0;
+另外还有一种不同的初始化语法，称为“构造函数语法”：
+int num_tries(0);
+	为什么会有两种不同的初始化方法呢？解答如下：
+以assignment运算符（=）进行初始化，这个操作沿袭C语言。如果对象属于内建型别，或者对象可以单一值加以初始化，这种方式没有问题。例如：
+string sequence_name = "Fibonacci";
+但是，如果对象需要多个初始值，这种方式就没办法完成任务了。以标准程序库中的复数类为例，它就需要两个初始值，一为实部，一为虚部：
+#include <complex>
+complex<double> purel(0, 7);
+
+1.5. 如何运用Arrays（数组）和Vectors（向量）
+	以下是六种数列的前8个元素值：
+Fibonacci: 		1, 1, 2, 3, 5, 8, 13, 21
+Lucas:			1, 3, 4, 7, 11, 18, 29, 47
+Pell:			1, 2, 5, 12, 29, 70, 169, 408
+Triangular: 	1, 3, 6, 10, 15, 21, 28, 36
+Square: 		1, 4, 9, 16, 25, 36, 49, 64
+Pentagonal:		1, 5, 12, 22, 35, 51, 70, 92
+	我们的程序必须能够显示数列中的任意两个元素值，让用户猜测下一个元素值是什么。
+数组实现版本：
+	参考arrayGuess.cpp
+vector实现版本： 将数组替换为vector即可。
+	参考vectorGuess.cpp
+
+1.6 指针带来的弹性
+	前一节所显示的解法有两大缺点。第一，其上限是6个数列：如果用户猜完了这6个数列，程序会无预期的结束。第二，这个方法每次都以同样的顺序显示6组元素。
+	我们使用指针来解决此类问题，具体实现参考pointerGuess.cpp.
+
+
+1.7 文件的读写
+	欲对文件进行读写操作，首先得先含入fstream头文件：
+#include <fstream>
+为了开启一个可供输出的文件，我们定义一个ofstream对象，并将文件名传入：
+ofstream outfile("seq_data.txt");
+如果指定的文件并不存在，便会有一个文件被产生出来并开启作为输出之用。如果指定的文件已经存在，这个文件会被开启作为输出之用，而文件中原已存在的数据会被丢弃。
+我们可以增加ios_base::app，来表示追加数据。
+ofstream outfile("seq_data.txt", ios_base::app);
+我们必须判断是否成功打开了一个文件：
+if (!outfile) {
+	cerr << "Oops! unable to save session data!\n";
+} else {
+	outfile << usr_name << ' ' << num_tries << ' ' << num_right << endl;
+}
+endl: 不仅仅换行，而且清空缓冲区。
+	我们可以通过ifstream来读取文件。
+ifstream infile("seq_data.txt");
+
+练习1.5：
+	参考1.5.cpp
+练习1.6：
+	参考1.6.cpp
+练习1.7：
+	参考1.7.cpp
